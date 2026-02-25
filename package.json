@@ -12,7 +12,7 @@
   "dependencies": {
     "@azure/event-hubs": "^5.7.0",
     "@azure/eventhubs-checkpointstore-blob": "^1.0.1",
-    "@azure/identity": "^2.0.4",
+    "@azure/identity": "^4.13.0",
     "@azure/keyvault-secrets": "^4.4.0",
     "@azure/storage-blob": "^12.8.0",
     "cookie-parser": "^1.4.6",
