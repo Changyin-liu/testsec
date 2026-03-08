@@ -24,6 +24,7 @@ jobs:
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
         with:
+          # 需要前端上传lock文件, 是根据lock文件中的具体版本来识别漏洞的, 没有lock的就先npm install生成lock
           # 【核心配置】只要发现 low (低危) 及以上级别的漏洞，立即让任务失败
           # 可选值: low, moderate, high, critical
           fail-on-severity: low 
