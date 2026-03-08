@@ -9,11 +9,10 @@ on:
       - '**/yarn.lock'
       - '**/pnpm-lock.yaml'
 
-# 权限设置：需要读取内容和写入 PR 评论（可选），以及读取安全检查数据
+# 权限设置：需要读取代码和写入 PR 评论
 permissions:
   contents: read
   pull-requests: write
-  actions: read
 
 jobs:
   dependency-check:
@@ -23,24 +22,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Dependency Review
-        id: dep_review
         uses: actions/dependency-review-action@v4
         with:
-          # 配置严格模式：只要有任何程度的漏洞都失败
+          # 【核心配置】只要发现 low (低危) 及以上级别的漏洞，立即让任务失败
           # 可选值: low, moderate, high, critical
           fail-on-severity: low 
           
-          # 生成报告文件，方便后续步骤读取发邮件
-          # 默认会在 github workspace 生成 dependency-review.md 和 json 数据
-          comment-summary-in-pr: always 
+          # 在 PR 下方自动评论详细的漏洞报告（方便开发者知道哪个包有问题）
+          comment-summary-in-pr: always
           
-          # 如果需要忽略某些特定的 CVE (误报情况)，可以在这里配置
-          # ignore-cves: CVE-2023-XXXXX
-
-      # --- 以下步骤仅在上面的检查失败时执行 (即发现了漏洞) ---
-      
-      - name: Process Vulnerability Report & Send Email
-        if: failure() && steps.dep_review.outcome == 'failure'
-        run: |
-          echo "有漏洞"
-          exit 1
+          # (可选) 如果是私有包或特定误报，可以在这里忽略，目前先不开启
+          # ignore-cves: CVE-XXXX-XXXXX
