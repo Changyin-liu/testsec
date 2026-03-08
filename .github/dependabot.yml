@@ -3,19 +3,16 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "daily" # 每天扫描一次
+      interval: "daily"
       time: "09:00"
       timezone: "Asia/Shanghai"
     
-    # 【核心配置】设置为 0，禁止自动创建 Pull Request
+    # 【关键】数量设为 0，禁止自动创建 PR，只保留后台扫描和警报功能
     open-pull-requests-limit: 0
     
-    # 可选：添加标签，方便在 Security 面板筛选
-    labels:
-      - "security-alert"
-      - "npm-dependencies"
-    
-    # 可选：忽略某些非关键依赖的告警，避免邮件轰炸
-    # ignore:
-    #   - dependency-name: "dev-only-package"
-    #     update-types: ["version-update:semver-patch"]
+    # 确保开启安全更新检查（虽然不自动提 PR，但需要它更新漏洞库）
+    groups:
+      # 可选：将依赖分组以便管理，但不影响扫描逻辑
+      all-npm:
+        patterns:
+          - "*"
