@@ -24,7 +24,7 @@ jobs:
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
         with:
-          # 需要前端上传lock文件, 是根据lock文件中的具体版本来识别漏洞的, 没有lock的就先npm install生成lock
+          
           # 【核心配置】只要发现 low (低危) 及以上级别的漏洞，立即让任务失败
           # 可选值: low, moderate, high, critical
           fail-on-severity: low 
@@ -34,3 +34,10 @@ jobs:
           
           # (可选) 如果是私有包或特定误报，可以在这里忽略，目前先不开启
           # ignore-cves: CVE-XXXX-XXXXX
+###
+# 前端需要上传lock文件, 是根据lock文件中的具体版本来识别漏洞的, 没有lock的就先npm install生成lock
+# 对于 Java如果是Gradle按照一下生成lock文件, mvn的pom.xml已记录详细版本不需要再额外生成.
+#./gradlew --write-locks
+# 或者
+#./gradlew dependencies --write-locks
+# golang需要上传go,mod和go.sum, 没有就用go mod tidy生成
