@@ -1,0 +1,105 @@
+name: NPM Dependency Security Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '.github/workflows/npm-security-check.yml'
+
+# 需要读取内容和写入安全信息的权限
+permissions:
+  contents: read
+  pull-requests: write # 用于在 PR 中评论详情
+  actions: read
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # 根据你的项目版本调整
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts # 安装依赖但不运行脚本，安全且快速
+
+      - name: Run NPM Audit
+        id: audit
+        run: |
+          # 生成 JSON 报告
+          npm audit --json > audit-report.json || true
+          
+          # 检查是否有高危漏洞 (critical 或 high)
+          # npm audit exit code 是 1 如果有漏洞，但我们想自定义逻辑
+          CRITICAL_COUNT=$(cat audit-report.json | jq '.metadata.vulnerabilities.critical // 0')
+          HIGH_COUNT=$(cat audit-report.json | jq '.metadata.vulnerabilities.high // 0')
+          
+          echo "critical=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+          echo "high=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          
+          if [ "$CRITICAL_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
+            echo "VULNERABILITY_FOUND=true" >> $GITHUB_OUTPUT
+            echo "::error::Found $CRITICAL_COUNT critical and $HIGH_COUNT high severity vulnerabilities!"
+            exit 1 # 这一步会让 Job 失败，从而触发 Status Check 失败
+          else
+            echo "VULNERABILITY_FOUND=false" >> $GITHUB_OUTPUT
+            echo "No high/critical vulnerabilities found."
+          fi
+
+      - name: Post Comment on PR (If Vulnerabilities Found)
+        if: failure() && steps.audit.outputs.VULNERABILITY_FOUND == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('audit-report.json', 'utf8'));
+            const critical = report.metadata.vulnerabilities.critical;
+            const high = report.metadata.vulnerabilities.high;
+            
+            let body = '### 🚨 NPM Security Alert\n\n';
+            body += 'This PR introduces dependencies with known vulnerabilities.\n\n';
+            body += `| Severity | Count |\n|---|---|\n| Critical | ${critical} |\n| High | ${high} |\n\n`;
+            body += 'Please upgrade the affected packages before merging.\n\n';
+            body += 'Details:\n```json\n' + JSON.stringify(report.advisories, null, 2).substring(0, 500) + '...\n```\n';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      # --- 可选：自定义邮件通知 (如果不依赖 GitHub 原生通知) ---
+      - name: Send Email Alert
+        if: failure() && steps.audit.outputs.VULNERABILITY_FOUND == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.office365.com # 替换为你的 SMTP 服务器 (L'Oreal 内部 SMTP)
+          server_port: 587
+          username: ${{ secrets.EMAIL_USER }} # 在 Settings -> Secrets 中配置发件人账号
+          password: ${{ secrets.EMAIL_PASS }} # 在 Settings -> Secrets 中配置密码/授权码
+          subject: "🚨 GitHub PR Security Alert: Vulnerable NPM Packages Detected"
+          to: changyin.liu@loreal.com
+          from: "GitHub Actions <noreply@your-company.com>"
+          body: |
+            A Pull Request has introduced vulnerable NPM dependencies.
+            
+            Repository: ${{ github.repository }}
+            PR: ${{ github.event.pull_request.html_url }}
+            Branch: ${{ github.head_ref }}
+            
+            Critical Vulnerabilities: ${{ steps.audit.outputs.critical }}
+            High Vulnerabilities: ${{ steps.audit.outputs.high }}
+            
+            Please review and fix before merging.
+          # 注意：如果是公司内部 SMTP，可能需要配置 SSL/TLS 或忽略证书验证，具体视公司策略而定
+          # secure: false 
+          # ignore_cert: true 
